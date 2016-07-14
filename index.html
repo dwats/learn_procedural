@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" type="text/css" href="css/base.css">
+	<style>
+		#clear {
+			float:right;
+		}
+	</style>
+</head>
+<body>
+	<!--Inputs/controls-->
+	<div id="controls">
+		<div>
+			<div>Dimensions (<strong>w x h</strong> in pixels)</div>
+			<input id="width" value=20> x <input id="height" value=20>
+		</div>
+		<div>
+			<div>Resolution Scale</div>
+			<input id="scale" value=5>
+		</div>
+		<div>
+			<div>Density (A number between 0 and 1. 0 = Empty, 1 = full)</div>
+			<input id="choke" value=0.5>
+		</div>
+		<hr/>
+		<button id="gen" onclick="genNewStart()">Generate</button>
+		<button id="step" onclick="animStep()">Step</button>
+		<button id="play" onclick="animRun()">Start</button>
+		<button id="stop" onclick="animPause()">Pause</button>
+		<button id="clean" onClick="cleanFrame()">Clean</button>
+		<button id="grid-tog" onClick="togGrid()">Toggle Grid</button>
+		<button id="floodfill-tog" onClick="togFlood()">Toggle Flood-Fill Visual</button>
+		<span id="cursor-pos"></span>
+		<button id="clear" onClick="clearFrame()">Clear</button>
+	</div>
+	<!--Canvas-->
+	<div id="canvas-shell"></div>
+	<!--Script-->
+	<script type="text/javascript" src="js/canvas.js"></script>
+	<script type="text/javascript" src="js/gameoflife.js"></script>
+</body>
+</html>
