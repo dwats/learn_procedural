@@ -161,7 +161,7 @@ let floodfillDraw = function(x,y) {
 			} else {
 				reject(Error("Error in floodfillDraw"));
 			}
-		}, 70);
+		}, 100);
 	});
 };
 
