@@ -1,4 +1,9 @@
 /* jshint esversion:6 */
+/**
+ * TODO Switch to arrow functions
+ * TODO Find performance issue cause
+ * 			Large maps cause cleanMap stack to crash/freeze tab.
+ */
 let gridY, gridX;
 let frameNow = [];
 let frameNext = [];
@@ -7,7 +12,7 @@ let animId;
  * Return a random noise array using gridX and gridY as size references.
  * @param {Number} choke Number between 0 and 1. limits the return of values equaling 1.
  */
-let getRandomFrame = function(choke) {
+let getRandomFrame = (choke) => {
 	let out = [];
 	//loop y
 	for (let y = 0; y < gridY; y++) {
@@ -27,7 +32,7 @@ let getRandomFrame = function(choke) {
  * randomly chosen value of either 0 or 1.
  * @param {Number} choke A number between 0 and 1. Increases density of returned 1s.
  */
-let getCellValue = function(choke) {
+let getCellValue = (choke) => {
 	let raw = Math.random();
 	if (raw > choke) {
 		return 0;
@@ -147,29 +152,30 @@ let caveRuleset = function(count, cell) {
  * @param {array} map A 2D array of 0s and 1s.
  * @return {array}
  */
-let cleanMap = function(map) {
-	return getRooms(map).then(function(rooms){
-		let largest = getLargestRoom(rooms);
+let cleanMap = (map) => {
+	let rooms = getRooms(map);
 
-		try {
-			console.log("Rooms Count:", rooms.length,
-				"largest:", largest.size, "index:", largest.index);
+	return rooms.then((rooms) => {
+    let largest = getLargestRoom(rooms);
+    try {
+      console.log("Rooms Count:", rooms.length,
+          "largest:", largest.size, "index:", largest.index);
+      // remove largest room from array
+      rooms.splice(largest.index, 1);
 
-			// remove largest room from array
-			rooms.splice(largest.index, 1);
+      // delete all other rooms
+      rooms.forEach((room) => {
+        room.forEach((cell) => {
+          map[cell.y][cell.x] = 1;
+        });
+      });
+      return map;
 
-			// delete all other rooms
-			rooms.forEach(function(room) {
-				room.forEach(function(cell) {
-					map[cell.y][cell.x] = 1;
-				});
-			});
-			return map;
-		}
-		catch(e){
-			console.log("cleanMap:",e);
-			return map;
-		}
+    } catch (e) {
+
+      console.log("cleanMap:", e);
+      return map;
+    }
 	});
 };
 
@@ -179,92 +185,104 @@ let cleanMap = function(map) {
  * @param {array} map 2D array representing our map (caves).
  * @return {array}
  */
-let getRooms = function(map) {
-		let rooms = [];
+let getRooms = (map) => {
+	// flatmap is a 1D array of objects. These objects represent the points within our frame.
+	let rooms = [].concat.apply([], frameNow.map((row, y) => {
+		return row.map((cell, x) => {
+	    let thisCell = {
+	      'x':x,
+	      'y':y,
+	      'value': cell
+	    };
+			if (!thisCell.value) {
+				return getRoom(map, thisCell).then((fullroom) => {
+					return fullroom;
+				});
+			}
+	  });
+	}))
+	.filter((value) => value );
+
+	return Promise.all(rooms).then((items) => {
 		let checked = [];
-		// flatten 2D map array into a 1D array of x, y coords and the value at that point.
-		let flatMap = [].concat.apply([], frameNow.map(function(row, y) {
-		  return row.map(function(cell, x) {
-		    return {
-		      'x':x,
-		      'y':y,
-		      'value': cell
-		    };
-		  });
-		}));
+		let cleanRooms = items.reduce((output, room) => {
 
-		rooms = flatMap.map(function(obj, index){
-			return getRoom(map, checked, obj).then(function(fullroom) {
-				console.log(fullroom);
-			});
+			if (!roomChecked(room[0].x, room[0].y, checked)) {
+				checked.push(room);
+				output = checked;
+			}
+			return output;
 		});
 
-		Promise.all(rooms).then(function(item) {
-			console.log("items:",item);
-		});
-
-
+		console.log("clean:", cleanRooms);
+		return cleanRooms;
+	}).catch((err) => {
+		throw(err);
+	});
 };
 
 /**
- *
+ * @param {array} map 2D array representing our map (caves).
+ * @param {Object} roomCandidate Starting cell's information
+ * @param {Number} roomCandidate.x Starting Cell's x-coordinates
+ * @param {Number} roomCandidate.y Starting Cell's y-coordinates
+ * @param {Number} roomCandidate.value Starting Cell's value, 0 or 1.
  */
-let recurseCount;
-let getRoom = function(map, checked, roomCandidate) {
-	return new Promise(function(resolve, reject){
+let getRoom = (map, roomCandidate) => {
+	return new Promise((resolve, reject) => {
 		let room = [];
 		let x = roomCandidate.x;
 		let y = roomCandidate.y;
 		let value = roomCandidate.value;
-		recurseCount = 0;
 
-		if (!value && !roomChecked(x, y, checked)) {
-			return floodfill(x, y, map, room).then(function(fullroom) {
-				resolve(fullroom);
-			}).catch(function(err) {
-				console.log("getRoom:", err);
-			});
+		if (map[y][x]) {
+			reject(new Error("This is not a floor tile:" + map[y][x]));
+		}
+
+		floodfill(x, y, map, room, 1).then((fullroom) => {
+			resolve(fullroom);
+		}).catch((err) => {
+			console.log("getRoom:", err);
+		});
+
+	});
+};
+
+/**
+ * @param {Number} x The x-value of the current cell
+ * @param {Number} y The y-value of the current cell
+ * @param {Array} map 2D array representing our map (caves).
+ * @param {Array} room 1D array containing all cell coords in this room.
+ * @param {Number} count Live recursion count. Allows resolve when room mapped.
+ * @return {Array} Promise with array representing room's floor tiles.
+ */
+let floodfill = (x, y, map, room, count) => {
+	count = count || 0;
+
+	return new Promise((resolve) => {
+		if (map[y][x] || cellChecked(x, y, room)) {
+			return;
 		} else {
-			return null;
+			//floodfillDraw(x, y);
+			room.push({
+				'x': x,
+				'y': y
+			});
+			floodfill(x, y+1, map, room, count + 1);
+			floodfill(x+1, y, map, room, count + 1);
+			floodfill(x, y-1, map, room, count + 1);
+			floodfill(x-1, y, map, room, count + 1);
+			count--;
+			if (!count) {
+				resolve(room);
+			}
 		}
 	});
 };
 
 /**
- * @param {number} x The x-value of the current cell
- * @param {number} y The y-value of the current cell
- * @param {array} map 2D array representing our map (caves).
- * @param {array} room 1D array containing all cell coords in this room.
+ * TODO Comment getLargestRoom
  */
-let floodfill = function(x, y, map, room) {
-	// Check if the current cell is 1 or this cell has been checked already.
-	return new Promise(function(resolve, reject) {
-		if (map[y][x] || cellChecked(x, y, room)) {
-			return;
-		} else {
-			// add cell object to room array
-			room.push({
-				'x': x,
-				'y': y
-			});
-			recurseCount++;
-			// draw floodfill step then call recursively call self.
-			return floodfillDraw(x, y).then(function() {
-				recurseCount--;
-				if (!recurseCount) {
-					resolve(room);
-				}
-				floodfill(x+1, y, map, room); // east
-				floodfill(x-1, y, map, room); // west
-				floodfill(x, y+1, map, room); // south
-				floodfill(x, y-1, map, room); // north
-			}).catch(function(err) {
-				console.log(err);
-			});
-		}
-	});
-};
-
 let getLargestRoom = function(rooms) {
 	let out = {
 		'size':-2,
@@ -292,6 +310,9 @@ let getLargestRoom = function(rooms) {
 
 };
 
+/**
+ * TODO Comment cellChecked
+ */
 let cellChecked = function(x, y, room) {
 	for (let i = 0; i < room.length; i++) {
 		if (room[i].x === x && room[i].y === y) {
@@ -301,6 +322,9 @@ let cellChecked = function(x, y, room) {
 	return false;
 };
 
+/**
+ * TODO comment roomChecked
+ */
 let roomChecked = function(x, y, rooms) {
 	for (let i = 0; i < rooms.length; i++) {
 		if (Array.isArray(rooms[i])) {
