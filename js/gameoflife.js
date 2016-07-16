@@ -154,29 +154,26 @@ let caveRuleset = function(count, cell) {
  */
 let cleanMap = (map) => {
 	let rooms = getRooms(map);
+  let largest = getLargestRoom(rooms);
+  try {
+    console.log("Rooms Count:", rooms.length,
+        "largest:", largest.size, "index:", largest.index);
+    // remove largest room from array
+    rooms.splice(largest.index, 1);
 
-	return rooms.then((rooms) => {
-    let largest = getLargestRoom(rooms);
-    try {
-      console.log("Rooms Count:", rooms.length,
-          "largest:", largest.size, "index:", largest.index);
-      // remove largest room from array
-      rooms.splice(largest.index, 1);
-
-      // delete all other rooms
-      rooms.forEach((room) => {
-        room.forEach((cell) => {
-          map[cell.y][cell.x] = 1;
-        });
+    // delete all other rooms
+    rooms.forEach((room) => {
+      room.forEach((cell) => {
+        map[cell.y][cell.x] = 1;
       });
-      return map;
+    });
+    return map;
 
-    } catch (e) {
+  } catch (e) {
 
-      console.log("cleanMap:", e);
-      return map;
-    }
-	});
+    console.log("cleanMap:", e);
+    return map;
+  }
 };
 
 /**
@@ -187,65 +184,33 @@ let cleanMap = (map) => {
  */
 let getRooms = (map) => {
 	// flatmap is a 1D array of objects. These objects represent the points within our frame.
-	let rooms = [].concat.apply([], frameNow.map((row, y) => {
-		return row.map((cell, x) => {
-	    let thisCell = {
-	      'x':x,
-	      'y':y,
-	      'value': cell
-	    };
-			if (!thisCell.value) {
-				return getRoom(map, thisCell).then((fullroom) => {
-					return fullroom;
-				});
-			}
-	  });
-	}))
-	.filter((value) => value );
+	let rooms = [];
 
-	return Promise.all(rooms).then((items) => {
-		let checked = [];
-		let cleanRooms = items.reduce((output, room) => {
-
-			if (!roomChecked(room[0].x, room[0].y, checked)) {
-				checked.push(room);
-				output = checked;
+	map.forEach((row, y) => {
+		row.forEach((cell, x) => {
+			if (!roomChecked(x, y, rooms) && !cell) {
+				let thisCell = {'x' : x, 'y' : y, 'value' : cell};
+				getRoom(map, rooms, thisCell);
 			}
-			return output;
 		});
-
-		console.log("clean:", cleanRooms);
-		return cleanRooms;
-	}).catch((err) => {
-		throw(err);
 	});
+
+	return rooms;
 };
 
 /**
  * @param {array} map 2D array representing our map (caves).
  * @param {Object} roomCandidate Starting cell's information
- * @param {Number} roomCandidate.x Starting Cell's x-coordinates
- * @param {Number} roomCandidate.y Starting Cell's y-coordinates
- * @param {Number} roomCandidate.value Starting Cell's value, 0 or 1.
+ * 				{Number} roomCandidate.x Starting Cell's x-coordinates
+ * 				{Number} roomCandidate.y Starting Cell's y-coordinates
+ * 				{Number} roomCandidate.value Starting Cell's value, 0 or 1.
+ * @return {Array}
  */
-let getRoom = (map, roomCandidate) => {
-	return new Promise((resolve, reject) => {
-		let room = [];
-		let x = roomCandidate.x;
-		let y = roomCandidate.y;
-		let value = roomCandidate.value;
-
-		if (map[y][x]) {
-			reject(new Error("This is not a floor tile:" + map[y][x]));
-		}
-
-		floodfill(x, y, map, room, 1).then((fullroom) => {
-			resolve(fullroom);
-		}).catch((err) => {
-			console.log("getRoom:", err);
-		});
-
-	});
+let getRoom = (map, rooms, roomCandidate) => {
+	let x = roomCandidate.x;
+	let y = roomCandidate.y;
+	let value = roomCandidate.value;
+	rooms.push(floodfill(x, y, map, []));
 };
 
 /**
@@ -253,32 +218,22 @@ let getRoom = (map, roomCandidate) => {
  * @param {Number} y The y-value of the current cell
  * @param {Array} map 2D array representing our map (caves).
  * @param {Array} room 1D array containing all cell coords in this room.
- * @param {Number} count Live recursion count. Allows resolve when room mapped.
- * @return {Array} Promise with array representing room's floor tiles.
+ * @return {Array}
  */
-let floodfill = (x, y, map, room, count) => {
-	count = count || 0;
-
-	return new Promise((resolve) => {
-		if (map[y][x] || cellChecked(x, y, room)) {
-			return;
-		} else {
-			//floodfillDraw(x, y);
-			room.push({
-				'x': x,
-				'y': y
-			});
-			floodfill(x, y+1, map, room, count + 1);
-			floodfill(x+1, y, map, room, count + 1);
-			floodfill(x, y-1, map, room, count + 1);
-			floodfill(x-1, y, map, room, count + 1);
-			count--;
-			if (!count) {
-				resolve(room);
-			}
-		}
-	});
+let floodfill = (x, y, map, room) => {
+	if (map[y][x] || cellChecked(x, y, room)) {
+		return;
+	} else {
+		room.push({'x':x, 'y':y});
+		floodfill(x, y+1, map, room);
+		floodfill(x+1, y, map, room);
+		floodfill(x, y-1, map, room);
+		floodfill(x-1, y, map, room);
+		return room;
+	}
 };
+
+
 
 /**
  * TODO Comment getLargestRoom
@@ -428,9 +383,7 @@ let clearFrame = function() {
 
 let cleanFrame = function() {
 	animPause();
-	cleanMap(frameNow).then(function(map){
-		frameNow = map;
-		frameDraw(frameNow);
-		updateCanvas();
-	});
+	frameNow = cleanMap(frameNow);
+	frameDraw(frameNow);
+	updateCanvas();
 };
