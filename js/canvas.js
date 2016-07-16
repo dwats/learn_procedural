@@ -157,11 +157,11 @@ let floodfillDraw = function(x,y) {
 			canvasData.data[index + 3] = 125;
 			updateCanvas();
 			if (canvasData.data[index + 1] === 0) {
-				resolve("drawn");
+				resolve({'x':x, 'y':y});
 			} else {
 				reject(Error("Error in floodfillDraw"));
 			}
-		}, 100);
+		}, 1);
 	});
 };
 
